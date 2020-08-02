@@ -14,9 +14,13 @@
     renderDisplay(percentLeft);
   }
   let takeRestRound = true;
-  let restTime = 60;
+  let humanRestTime = "60";
+  let restTime: number;
+  $: restTime = safeParseInt(humanRestTime);
   let playIntervalSound = false;
-  let intervalTime = 30;
+  let humanIntervalTime = "30";
+  let intervalTime: number;
+  $: intervalTime = safeParseInt(humanIntervalTime);
   let playSounds = true;
   type DisplayStyle = "rectangle" | "circle";
   let timerStyle: DisplayStyle = "circle";
@@ -98,11 +102,11 @@
   }
 
   function safeParseInt(input: string): number {
-    let result = parseInt(input);
-    if (Number.isNaN(result)) {
+    let parsed = parseInt(input, 10);
+    if (Number.isNaN(parsed)) {
       return 0;
     } else {
-      return result;
+      return parsed;
     }
   }
 
@@ -275,7 +279,9 @@
     <div id="restTimeControls" class="mt-4 mx-4">
       <input class="mr-2" type="checkbox" bind:checked={takeRestRound} />
       Rest Time:
-      <input class="ml-2 mr-1 w-8 rounded text-center" bind:value={restTime} />
+      <input
+        class="ml-2 mr-1 w-8 rounded text-center"
+        bind:value={humanRestTime} />
       seconds
     </div>
 
@@ -292,7 +298,7 @@
       <input
         id="interval"
         class="ml-2 mr-1 w-8 rounded text-center"
-        bind:value={intervalTime} />
+        bind:value={humanIntervalTime} />
       seconds
     </div>
 
