@@ -1,7 +1,5 @@
 # What is this
 
-This is the code for [zygen.net/timer](https://zygen.net/timer).  I built it using Svelte, Typescript, and Tailwind, make, and yarn.
+This is the code for [zygen.net/timer](https://zygen.net/timer).  I built it using Svelte, Typescript, and Tailwind as a learning exercise.
 
-Tailwind integration was done following https://dev.to/sarioglu/using-svelte-with-tailwindcss-a-better-approach-47ph.
-
-The production deploy of this app is truly remarkably small. The shipped javascript and css come in at
+The production deploy of this app is truly remarkably small. The combined compressed html, css, and javascript are less than 7 kb.
