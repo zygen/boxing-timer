@@ -194,7 +194,7 @@
     transform: translate(-50%, -50%);
     z-index: 9;
   }
-  #circle1 {
+  #innerCircle {
     height: 165px;
     width: 165px;
     background-color: #fff;
@@ -205,7 +205,7 @@
     transform: translate(-50%, -50%);
     z-index: 1;
   }
-  #circle2 {
+  #outerCircle {
     height: 196px;
     width: 196px;
     background-color: #e5f6f8;
@@ -239,8 +239,8 @@
     <div
       class="relative h-56 w-64 -mb-4 mx-auto flex items-center justify-center"
       class:hidden={!(timerStyle === 'circle')}>
-      <div id="circle1" />
-      <div id="circle2" />
+      <div id="innerCircle" />
+      <div id="outerCircle" />
       <canvas height="200" width="200" id="circleDisplay" />
     </div>
 
