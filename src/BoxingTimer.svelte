@@ -122,11 +122,26 @@
   }
 
   let display: CanvasRenderingContext2D;
+  // SVG Display
+  let progressValue = 0;
+  $: progressValue = percentLeft * (252 / 100);
+  let arc;
+  $: if (arc) {
+    arc.style.strokeDashoffset = progressValue;
+  }
+  let maxArcLength = 252;
+  // let arcLength; // arc.getTotalLength() #=> 250.36
+  // $: if (arcLength !== undefined) {
+  //   arcLength.innerHTML = arc.getTotalLength();
+  // }
 
   onMount(() => {
     let canvas = document.getElementById("circleDisplay") as HTMLCanvasElement;
     canvas = makeHiPPICanvas(canvas);
     display = canvas.getContext("2d");
+    arc = document.querySelector("#progressArc");
+    // arcLength = document.querySelector("#arcLength");
+
     renderDisplay(100);
   });
 
@@ -216,6 +231,12 @@
     transform: translate(-50%, -50%);
     z-index: -1;
   }
+  #progressArc {
+    stroke-dasharray: 252;
+    stroke-dashoffset: 0;
+    transform-origin: 50px 50px;
+    transform: rotate(-90deg) scale(-1);
+  }
 </style>
 
 <div class="flex flex-wrap">
@@ -237,11 +258,87 @@
     </div>
 
     <div
-      class="relative h-56 w-64 -mb-4 mx-auto flex items-center justify-center"
+      class="relative h-56 w-64 mx-auto flex items-center justify-center"
       class:hidden={!(timerStyle === 'circle')}>
       <div id="innerCircle" />
       <div id="outerCircle" />
       <canvas height="200" width="200" id="circleDisplay" />
+    </div>
+
+    <div
+      class="relative h-64 w-64 mx-auto flex items-center justify-center"
+      class:hidden={!(timerStyle === 'circle')}>
+      <svg class="border border-green-500" viewBox="0 0 100 100">
+        <g id="grid" stroke="green" stroke-width=".2">
+          <path d="M0 10 H100" />
+          <path d="M0 20 H100" />
+          <path d="M0 30 H100" />
+          <path d="M0 40 H100" />
+          <path d="M0 50 H100" stroke-width="1" />
+          <path d="M0 60 H100" />
+          <path d="M0 70 H100" />
+          <path d="M0 80 H100" />
+          <path d="M0 90 H100" />
+
+          <path d="M10 0 V100" />
+          <path d="M20 0 V100" />
+          <path d="M30 0 V100" />
+          <path d="M40 0 V100" />
+          <path d="M50 0 V100" stroke-width="1" />
+          <path d="M60 0 V100" />
+          <path d="M70 0 V100" />
+          <path d="M80 0 V100" />
+          <path d="M90 0 V100" />
+        </g>
+
+        <!--
+        <g id="points" fill="hsl(25, 100%, 50%)" transform="translate(50, 50)">
+          <circle cx="-40" cy="0" r="1" />
+          <circle cx="0" cy="0" r="1" />
+          <circle cx="40" cy="0" r="1" />
+        </g> -->
+
+        <!-- A rx ry x-axis-rotation large-arc-flag sweep-flag x y -->
+
+        <path
+          id="backgroundArc"
+          d="M10,50 A40,40 0 1 0 10,49.99"
+          stroke="blue"
+          stroke-width="8.5"
+          fill="none" />
+        <path
+          id="progressArc"
+          d="M10,50 A40,40 0 1 0 10,49.99"
+          stroke="white"
+          stroke-width="10"
+          fill="none" />
+
+        <text
+          id="svgTime"
+          x="50%"
+          y="50%"
+          text-anchor="middle"
+          alignment-baseline="central">
+          {formatTime(timeLeft)}
+        </text>
+
+      </svg>
+
+    </div>
+    <div class="flex mx-4 justify-between">
+      <!-- <div id="arcLength" /> -->
+      <input
+        class="mt-2"
+        type="range"
+        bind:value={progressValue}
+        min="0"
+        max="252" />
+      <input
+        class="mt-2 w-12"
+        type="number"
+        bind:value={progressValue}
+        min="0"
+        max="252" />
     </div>
 
     <div id="timerControls" class="mt-4 mx-4 flex justify-between">
