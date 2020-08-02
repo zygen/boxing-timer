@@ -128,7 +128,7 @@
 
   function renderDisplay(percent: number) {
     let startingPoint = 4.72;
-    let endingPoint = (percent / 100) * 2 * Math.PI * 10;
+    let endingPoint = (percent / 100) * 2 * Math.PI;
 
     // Start from scratch when this function is called
     display.clearRect(0, 0, display.canvas.width, display.canvas.height);
@@ -141,9 +141,10 @@
     // render time left in the middle
     display.fillText(formatTime(timeLeft), 100, 115); //fillText(text,x,y);
 
-    // render the progress ring around the outside
+    // render the progress ring around the outside by cutting out an
+    // arc representing a path to hide the circle below it
     display.beginPath();
-    display.arc(100, 100, 90, startingPoint, startingPoint + endingPoint / 10); //arc(x,y,radius,start,stop)
+    display.arc(100, 100, 90, startingPoint, startingPoint + endingPoint); //arc(x,y,radius,start,stop)
     display.stroke(); // needed to fill the arc path we just made
   }
 
