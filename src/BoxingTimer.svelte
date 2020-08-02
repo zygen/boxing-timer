@@ -19,7 +19,7 @@
   let intervalTime = 30;
   let playSounds = true;
   type DisplayStyle = "rectangle" | "circle";
-  let timerStyle: DisplayStyle = "rectangle";
+  let timerStyle: DisplayStyle = "circle";
 
   // State
   type State = "ready" | "working" | "stopped" | "resting";
@@ -179,6 +179,9 @@
   button {
     @apply py-2 px-4 rounded;
   }
+  hr {
+    @apply block my-4;
+  }
   #circleDisplay {
     position: absolute;
     top: 50%;
@@ -216,7 +219,10 @@
     class="w-72 border border-purple-700 rounded-lg pb-4 mx-auto my-4">
     <p class="text-2xl">Boxing Timer</p>
 
-    <p class="text">State: {currentState}</p>
+    <div class="text flex justify-evenly space-x-4 mx-auto">
+      <div>Round: {completedRounds + 1}</div>
+      <div>State: {currentState}</div>
+    </div>
 
     <div
       class="h-24 w-64 mt-4 bg-gray-300 mx-auto text-6xl flex items-center
@@ -265,16 +271,18 @@
         bind:value={humanRoundTime} />
     </div>
 
-    <div id="intervalControls" class="mt-4 mx-4">
-      <input class="mr-2" type="checkbox" bind:checked={playSounds} />
-      Play Round Begin/End Sounds
-    </div>
-
     <div id="restTimeControls" class="mt-4 mx-4">
       <input class="mr-2" type="checkbox" bind:checked={takeRestRound} />
       Rest Time:
       <input class="ml-2 mr-1 w-8 rounded text-center" bind:value={restTime} />
       seconds
+    </div>
+
+    <hr />
+
+    <div id="soundControls" class="mt-4 mx-4">
+      <input class="mr-2" type="checkbox" bind:checked={playSounds} />
+      Play Round Begin/End Sounds
     </div>
 
     <div id="intervalControls" class="mt-4 mx-4">
@@ -287,9 +295,11 @@
       seconds
     </div>
 
+    <hr />
+
     <div id="displayStyle" class="mt-4 mx-4">
-      <span class="pb-2">Timer Display Style</span>
-      <div class="ml-4">
+      Timer Display Style
+      <div class="mt-2 ml-4">
         <label>
           <input type="radio" bind:group={timerStyle} value={'rectangle'} />
           Rectangle
