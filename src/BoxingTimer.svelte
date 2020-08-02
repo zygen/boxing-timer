@@ -226,7 +226,7 @@
     </div>
 
     <div
-      class="relative h-64 w-64 mx-auto flex items-center justify-center"
+      class="relative h-56 w-64 -mb-4 mx-auto flex items-center justify-center"
       class:hidden={!(timerStyle === 'circle')}>
       <div id="circle1" />
       <div id="circle2" />
