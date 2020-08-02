@@ -10,8 +10,8 @@
   let roundTime = parseRoundTime(humanRoundTime);
   $: roundTime = parseRoundTime(humanRoundTime);
   $: percentLeft = (timeLeft / roundTime) * 100;
-  $: if (document.getElementById("counter")) {
-    fillCounter(percentLeft);
+  $: if (document.getElementById("circleDisplay")) {
+    renderDisplay(percentLeft);
   }
   let takeRestRound = true;
   let restTime = 60;
@@ -120,13 +120,13 @@
   let display: CanvasRenderingContext2D;
 
   onMount(() => {
-    let canvas = document.getElementById("counter") as HTMLCanvasElement;
-    canvas = makeHiDPICanvas(canvas);
+    let canvas = document.getElementById("circleDisplay") as HTMLCanvasElement;
+    canvas = makeHiPPICanvas(canvas);
     display = canvas.getContext("2d");
-    fillCounter(100);
+    renderDisplay(100);
   });
 
-  function fillCounter(percent: number) {
+  function renderDisplay(percent: number) {
     let startingPoint = 4.72;
     let endingPoint = (percent / 100) * 2 * Math.PI * 10;
 
@@ -137,8 +137,11 @@
     display.textAlign = "center";
     display.font = "bold 50px sans-serif";
     display.fillStyle = "#000";
+
+    // render time left in the middle
     display.fillText(formatTime(timeLeft), 100, 115); //fillText(text,x,y);
 
+    // render the progress ring around the outside
     display.beginPath();
     display.arc(100, 100, 90, startingPoint, startingPoint + endingPoint / 10); //arc(x,y,radius,start,stop)
     display.stroke(); // needed to fill the arc path we just made
@@ -157,7 +160,7 @@
     return dpr / bsr;
   })();
 
-  function makeHiDPICanvas(canvas: HTMLCanvasElement) {
+  function makeHiPPICanvas(canvas: HTMLCanvasElement) {
     let w = canvas.width;
     let h = canvas.height;
     canvas.width = w * PIXEL_RATIO;
@@ -176,7 +179,7 @@
   button {
     @apply py-2 px-4 rounded;
   }
-  #counter {
+  #circleDisplay {
     position: absolute;
     top: 50%;
     left: 50%;
@@ -227,7 +230,7 @@
       class:hidden={!(timerStyle === 'circle')}>
       <div id="circle1" />
       <div id="circle2" />
-      <canvas height="200" width="200" id="counter" />
+      <canvas height="200" width="200" id="circleDisplay" />
     </div>
 
     <div id="timerControls" class="mt-4 mx-4 flex justify-between">
