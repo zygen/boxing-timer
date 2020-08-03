@@ -21,8 +21,8 @@
   let humanIntervalTime = "30";
   let intervalTime: number;
   $: intervalTime = safeParseInt(humanIntervalTime);
-  let playSounds = true;
-  type DisplayStyle = "rectangle" | "circle";
+  let playSounds = false;
+  type DisplayStyle = "rectangle" | "circle" | "svg";
   let timerStyle: DisplayStyle = "circle";
 
   // State
@@ -145,8 +145,8 @@
   });
 
   function renderDisplay(percent: number) {
-    let startingPoint = 4.72; // top of circle is 1.5π
-    let endingPoint = (percent / 100) * 2 * Math.PI; // draw clockwise to percent of total circle
+    let startingRadian = 4.72; // top of circle is 1.5π
+    let endingRadian = (percent / 100) * 2 * Math.PI; // draw clockwise to percent of total circle
 
     // Start from scratch when this function is called
     display.clearRect(0, 0, display.canvas.width, display.canvas.height);
@@ -167,7 +167,13 @@
     // render the progress ring around the outside by cutting out an
     // arc representing a path to hide the circle below it
     display.beginPath();
-    display.arc(cw / 2, ch / 2, r, startingPoint, startingPoint + endingPoint); //arc(x,y,radius,start,stop)
+    display.arc(
+      cw / 2,
+      ch / 2,
+      r,
+      startingRadian,
+      startingRadian + endingRadian
+    ); //arc(x,y,radius,start,stop)
     display.strokeStyle = "#00ff43";
     display.stroke(); // needed to fill the arc path we just made
   }
@@ -220,6 +226,9 @@
     transform-origin: 50px 50px;
     transform: rotate(-90deg) scale(-1);
   }
+  svg {
+    @apply w-64 h-64;
+  }
   svg text {
     @apply font-bold;
   }
@@ -231,13 +240,13 @@
     class="w-72 border border-purple-700 rounded-lg pb-4 mx-auto my-4">
     <p class="text-2xl">Boxing Timer</p>
 
-    <div class="text flex justify-evenly space-x-4 mx-auto">
+    <div class="text mb-4 flex justify-evenly space-x-4 mx-auto">
       <div>Round: {completedRounds + 1}</div>
       <div>State: {currentState}</div>
     </div>
 
     <div
-      class="h-24 w-64 mt-4 bg-gray-300 mx-auto text-6xl flex items-center
+      class="h-24 w-64 bg-gray-300 mx-auto text-6xl flex items-center
       justify-center font-bold rounded"
       class:hidden={!(timerStyle === 'rectangle')}>
       {formatTime(timeLeft)}
@@ -251,7 +260,7 @@
 
     <div
       class="relative h-64 w-64 mx-auto flex items-center justify-center"
-      class:hidden={!(timerStyle === 'circle')}>
+      class:hidden={!(timerStyle === 'svg')}>
       <svg viewBox="0 0 100 100">
         <!-- <g id="grid" stroke="green" stroke-width=".2">
           <path d="M0 10 H100" />
@@ -305,7 +314,7 @@
           id="svgTime"
           class="font-bold text-2xl"
           x="50%"
-          y="59%"
+          y="51%"
           text-anchor="middle"
           alignment-baseline="middle">
           {formatTime(timeLeft)}
@@ -382,7 +391,11 @@
         </label>
         <label>
           <input type="radio" bind:group={timerStyle} value={'circle'} />
-          Circle
+          Circle (Canvas)
+        </label>
+        <label>
+          <input type="radio" bind:group={timerStyle} value={'svg'} />
+          Circle (SVG)
         </label>
       </div>
     </div>
