@@ -121,49 +121,54 @@
     return num.toString().padStart(2, "0");
   }
 
+  // Canvas Display
   let display: CanvasRenderingContext2D;
+  let cw = 256;
+  let ch = 256;
+  let r = 117;
+
   // SVG Display
+  let maxArcLength = 314;
   let progressValue = 0;
-  $: progressValue = percentLeft * (252 / 100);
+  $: progressValue = percentLeft * (maxArcLength / 100);
   let arc;
   $: if (arc) {
     arc.style.strokeDashoffset = progressValue;
   }
-  let maxArcLength = 252;
-  // let arcLength; // arc.getTotalLength() #=> 250.36
-  // $: if (arcLength !== undefined) {
-  //   arcLength.innerHTML = arc.getTotalLength();
-  // }
 
   onMount(() => {
     let canvas = document.getElementById("circleDisplay") as HTMLCanvasElement;
     canvas = makeHiPPICanvas(canvas);
     display = canvas.getContext("2d");
     arc = document.querySelector("#progressArc");
-    // arcLength = document.querySelector("#arcLength");
-
     renderDisplay(100);
   });
 
   function renderDisplay(percent: number) {
-    let startingPoint = 4.72;
-    let endingPoint = (percent / 100) * 2 * Math.PI;
+    let startingPoint = 4.72; // top of circle is 1.5π
+    let endingPoint = (percent / 100) * 2 * Math.PI; // draw clockwise to percent of total circle
 
     // Start from scratch when this function is called
     display.clearRect(0, 0, display.canvas.width, display.canvas.height);
-    display.lineWidth = 15;
-    display.strokeStyle = "#00ff43";
+    display.lineWidth = 20;
     display.textAlign = "center";
-    display.font = "bold 50px sans-serif";
+    display.font = "bold 4em sans-serif";
     display.fillStyle = "#000";
 
     // render time left in the middle
-    display.fillText(formatTime(timeLeft), 100, 115); //fillText(text,x,y);
+    display.fillText(formatTime(timeLeft), cw / 2, ch / 2 + 20); //fillText(text,x,y);
+
+    // render the background ring behind the progress ring
+    display.beginPath();
+    display.arc(cw / 2, ch / 2, r, 0, 2 * Math.PI); //arc(x,y,radius,start,stop)
+    display.strokeStyle = "#e5f6f8";
+    display.stroke(); // needed to fill the arc path we just made
 
     // render the progress ring around the outside by cutting out an
     // arc representing a path to hide the circle below it
     display.beginPath();
-    display.arc(100, 100, 90, startingPoint, startingPoint + endingPoint); //arc(x,y,radius,start,stop)
+    display.arc(cw / 2, ch / 2, r, startingPoint, startingPoint + endingPoint); //arc(x,y,radius,start,stop)
+    display.strokeStyle = "#00ff43";
     display.stroke(); // needed to fill the arc path we just made
   }
 
@@ -209,33 +214,14 @@
     transform: translate(-50%, -50%);
     z-index: 9;
   }
-  #innerCircle {
-    height: 165px;
-    width: 165px;
-    background-color: #fff;
-    border-radius: 50%;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 1;
-  }
-  #outerCircle {
-    height: 196px;
-    width: 196px;
-    background-color: #e5f6f8;
-    border-radius: 50%;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: -1;
-  }
   #progressArc {
-    stroke-dasharray: 252;
+    stroke-dasharray: 314;
     stroke-dashoffset: 0;
     transform-origin: 50px 50px;
     transform: rotate(-90deg) scale(-1);
+  }
+  svg text {
+    @apply font-bold;
   }
 </style>
 
@@ -258,18 +244,16 @@
     </div>
 
     <div
-      class="relative h-56 w-64 mx-auto flex items-center justify-center"
+      class="relative h-64 w-64 mx-auto flex items-center justify-center"
       class:hidden={!(timerStyle === 'circle')}>
-      <div id="innerCircle" />
-      <div id="outerCircle" />
-      <canvas height="200" width="200" id="circleDisplay" />
+      <canvas height={ch} width={cw} id="circleDisplay" />
     </div>
 
     <div
       class="relative h-64 w-64 mx-auto flex items-center justify-center"
       class:hidden={!(timerStyle === 'circle')}>
-      <svg class="border border-green-500" viewBox="0 0 100 100">
-        <g id="grid" stroke="green" stroke-width=".2">
+      <svg viewBox="0 0 100 100">
+        <!-- <g id="grid" stroke="green" stroke-width=".2">
           <path d="M0 10 H100" />
           <path d="M0 20 H100" />
           <path d="M0 30 H100" />
@@ -289,56 +273,44 @@
           <path d="M70 0 V100" />
           <path d="M80 0 V100" />
           <path d="M90 0 V100" />
-        </g>
-
-        <!--
-        <g id="points" fill="hsl(25, 100%, 50%)" transform="translate(50, 50)">
-          <circle cx="-40" cy="0" r="1" />
-          <circle cx="0" cy="0" r="1" />
-          <circle cx="40" cy="0" r="1" />
         </g> -->
 
         <!-- A rx ry x-axis-rotation large-arc-flag sweep-flag x y -->
+        <!-- Define a path so we can clip it later.  We do this to simulate an
+          inner stroke, since SVG doesn't support that natively yet.
+          Double the stoke size, and then clip to the outside, and your stroke is
+          now effectively inner. -->
+        <defs>
+          <path id="circle" d="M0,50 A50,50 0 1 0 0,49.999" />
+          <clipPath id="clip">
+            <use xlink:href="#circle" />
+          </clipPath>
+        </defs>
 
-        <path
+        <use
+          xlink:href="#circle"
           id="backgroundArc"
-          d="M10,50 A40,40 0 1 0 10,49.99"
           stroke="blue"
-          stroke-width="8.5"
-          fill="none" />
-        <path
+          stroke-width="18"
+          fill="none"
+          clip-path="url(#clip)" />
+        <use
+          xlink:href="#circle"
           id="progressArc"
-          d="M10,50 A40,40 0 1 0 10,49.99"
-          stroke="white"
-          stroke-width="10"
-          fill="none" />
-
+          stroke="#e5f6f8"
+          stroke-width="20"
+          fill="none"
+          clip-path="url(#clip)" />
         <text
           id="svgTime"
+          class="font-bold text-2xl"
           x="50%"
-          y="50%"
+          y="59%"
           text-anchor="middle"
-          alignment-baseline="central">
+          alignment-baseline="middle">
           {formatTime(timeLeft)}
         </text>
-
       </svg>
-
-    </div>
-    <div class="flex mx-4 justify-between">
-      <!-- <div id="arcLength" /> -->
-      <input
-        class="mt-2"
-        type="range"
-        bind:value={progressValue}
-        min="0"
-        max="252" />
-      <input
-        class="mt-2 w-12"
-        type="number"
-        bind:value={progressValue}
-        min="0"
-        max="252" />
     </div>
 
     <div id="timerControls" class="mt-4 mx-4 flex justify-between">
