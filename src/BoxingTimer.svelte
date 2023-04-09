@@ -1,98 +1,163 @@
-<script lang="typescript">
+<script lang="ts">
   import { onMount } from "svelte";
 
+  // Configurable
+  let humanRoundTime = "3:00";
+  let humanIntervalTime = "30";
+  let humanRestTime = "60";
+  let takeRestRound = true;
+  let playSounds = false;
+  let playIntervalSound = false;
+
+  // Derived
+  let roundTime = parseRoundTime(humanRoundTime);
+  $: roundTime = parseRoundTime(humanRoundTime);
+  let restTime = safeParseInt(humanRestTime);
+  $: restTime = safeParseInt(humanRestTime);
+  let intervalTime = safeParseInt(humanIntervalTime);
+  $: intervalTime = safeParseInt(humanIntervalTime);
+
+  $: percentLeft = (timeLeft / roundTime) * 100;
+
+  // Sound
   let roundBeginSound = new Audio(`BoxingCircuitBeginRound.mp3`);
   let roundEndSound = new Audio(`BoxingCircuitEndRound.mp3`);
   let intervalSound = new Audio(`BoxingCircuitBeginRound.mp3`);
 
-  // Configurable
-  let humanRoundTime = "3:00";
-  let roundTime = parseRoundTime(humanRoundTime);
-  $: roundTime = parseRoundTime(humanRoundTime);
-  $: percentLeft = (timeLeft / roundTime) * 100;
-  $: if (document.getElementById("circleDisplay")) {
-    renderDisplay(percentLeft);
-  }
-  let takeRestRound = true;
-  let humanRestTime = "60";
-  let restTime: number;
-  $: restTime = safeParseInt(humanRestTime);
-  let playIntervalSound = false;
-  let humanIntervalTime = "30";
-  let intervalTime: number;
-  $: intervalTime = safeParseInt(humanIntervalTime);
-  let playSounds = false;
-  type DisplayStyle = "rectangle" | "circle" | "svg";
-  let timerStyle: DisplayStyle = "circle";
+  //
+  // Core State Machine
+  //
 
-  // State
-  type State = "ready" | "working" | "stopped" | "resting";
+  type State =
+    | "ready"
+    | "start"
+    | "startRound"
+    | "working"
+    | "resting"
+    | "finishRound"
+    | "stopped"
+    | "reset";
+
+  type StateMachineEntry = {
+    onEnter?: () => void;
+    onExit?: () => void;
+  };
+
+  type StateMachine = Record<State, StateMachineEntry> & {
+    transition: (state: State) => void;
+  };
+
   let timeLeft = roundTime;
-  let timer: number;
+  let timer: NodeJS.Timeout;
   let currentState: State = "ready";
   let completedRounds = 0;
 
-  function transition(state: State, time: number) {
-    clearInterval(timer);
-    setTimeout(() => {
+  const stateMachine: StateMachine = {
+    ready: {
+      onEnter: () => {
+        timeLeft = roundTime;
+      },
+    },
+    start: {
+      onEnter: () => {
+        stateMachine.transition("working");
+      },
+    },
+    startRound: {
+      onEnter: () => {
+        timeLeft = roundTime;
+        stateMachine.transition("working");
+      },
+    },
+    working: {
+      onEnter: () => {
+        if (playSounds) {
+          roundBeginSound.play();
+        }
+        timer = startInterval(() => {
+          timeLeft -= 1;
+          if (timeLeft % intervalTime === 0 && timeLeft !== 0) {
+            if (playIntervalSound) {
+              intervalSound.play();
+            }
+          } else if (timeLeft === 0) {
+            stateMachine.transition("finishRound");
+          }
+        });
+      },
+      onExit: () => {
+        clearInterval(timer);
+      },
+    },
+    finishRound: {
+      onEnter: () => {
+        if (playSounds) {
+          roundEndSound.play();
+        }
+        completedRounds += 1;
+        if (takeRestRound) {
+          stateMachine.transition("resting");
+        } else {
+          stateMachine.transition("ready");
+        }
+      },
+    },
+    resting: {
+      onEnter: () => {
+        timeLeft = restTime;
+        timer = setInterval(() => {
+          timeLeft -= 1;
+          if (timeLeft === 0) {
+            stateMachine.transition("startRound");
+          }
+        }, 1000);
+      },
+      onExit: () => {
+        clearInterval(timer);
+      },
+    },
+    stopped: {
+      onEnter: () => {
+        clearInterval(timer);
+      },
+    },
+    reset: {
+      onEnter: () => {
+        completedRounds = 0;
+        stateMachine.transition("ready");
+      },
+    },
+    transition: (state: State) => {
+      const currentStateMachine = stateMachine[
+        currentState
+      ] as StateMachineEntry;
+      const newStateMachine = stateMachine[state] as StateMachineEntry;
+
+      console.log(`transition: ${currentState} -> ${state}`);
+      currentStateMachine.onExit?.();
       currentState = state;
-      timeLeft = time;
-    }, 0);
-  }
+      newStateMachine.onEnter?.();
+    },
+  };
+
+  // main interface
 
   function startTimer() {
-    if (currentState !== "working") {
-      timer = setInterval(() => {
-        if (timeLeft % intervalTime === 1 && timeLeft !== 1) {
-          if (playIntervalSound) {
-            intervalSound.play();
-          }
-        } else if (timeLeft === 0) {
-          finishRound();
-        }
-        timeLeft -= 1;
-      }, 1000);
-    }
-    setTimeout(() => {
-      currentState = "working";
-      if (playSounds) {
-        roundBeginSound.play();
-      }
-    }, 0);
-  }
-
-  function finishRound() {
-    if (playSounds) {
-      roundEndSound.play();
-    }
-    completedRounds += 1;
-    if (takeRestRound) {
-      transition("resting", restTime);
-      rest();
-    } else {
-      transition("ready", roundTime);
-      startTimer();
-    }
+    stateMachine.transition("start");
   }
 
   function stopTimer() {
-    clearInterval(timer);
-    currentState = "stopped";
+    stateMachine.transition("stopped");
   }
 
   function resetTimer() {
-    completedRounds = 0;
-    transition("ready", roundTime);
+    stateMachine.transition("reset");
   }
 
-  function rest() {
-    timer = setInterval(() => {
-      if (timeLeft === 0) {
-        transition("ready", roundTime);
-        startTimer();
-      }
-      timeLeft -= 1;
-    }, 1000);
+  // utilities
+
+  function startInterval(callback: () => void): NodeJS.Timeout {
+    return setInterval(callback, 1000);
   }
 
   function formatTime(timeInSeconds: number): string {
@@ -121,30 +186,48 @@
     return num.toString().padStart(2, "0");
   }
 
-  // Canvas Display
-  let display: CanvasRenderingContext2D;
-  let cw = 256;
-  let ch = 256;
-  let r = 117;
-
   // SVG Display
   let maxArcLength = 314;
   let progressValue = 0;
   $: progressValue = percentLeft * (maxArcLength / 100);
-  let arc;
+  let arc: HTMLElement | null;
   $: if (arc) {
-    arc.style.strokeDashoffset = progressValue;
+    arc.style.strokeDashoffset = progressValue.toString();
+  }
+
+  // Canvas Display
+  let display: CanvasRenderingContext2D | null;
+  let cw = 256;
+  let ch = 256;
+  let r = 117;
+
+  $: if (document.getElementById("circleDisplay")) {
+    if (!display) {
+      initializeCanvas();
+    }
+    renderDisplay(percentLeft);
   }
 
   onMount(() => {
-    let canvas = document.getElementById("circleDisplay") as HTMLCanvasElement;
-    canvas = makeHiPPICanvas(canvas);
-    display = canvas.getContext("2d");
-    arc = document.querySelector("#progressArc");
-    renderDisplay(100);
+    initializeCanvas();
   });
 
+  function initializeCanvas() {
+    let canvas = document.getElementById("circleDisplay") as HTMLCanvasElement;
+    if (canvas) {
+      canvas = makeHiPPICanvas(canvas);
+      display = canvas.getContext("2d");
+      arc = document.querySelector("#progressArc");
+      renderDisplay(100);
+    }
+  }
+
   function renderDisplay(percent: number) {
+    if (!display) {
+      console.log("Couldn't render display");
+      return;
+    }
+
     let startingRadian = 4.72; // top of circle is 1.5π
     let endingRadian = (percent / 100) * 2 * Math.PI; // draw clockwise to percent of total circle
 
@@ -198,97 +281,73 @@
     canvas.height = h * PIXEL_RATIO;
     canvas.style.width = w + "px";
     canvas.style.height = h + "px";
-    canvas.getContext("2d").setTransform(PIXEL_RATIO, 0, 0, PIXEL_RATIO, 0, 0);
+    canvas.getContext("2d")?.setTransform(PIXEL_RATIO, 0, 0, PIXEL_RATIO, 0, 0);
     return canvas;
   }
+
+  type DisplayStyle = "rectangle" | "circle" | "svg";
+  let timerStyle: DisplayStyle = "circle";
 </script>
 
-<style lang="postcss">
-  p {
-    @apply mt-4;
-  }
-  button {
-    @apply py-2 px-4 rounded;
-  }
-  hr {
-    @apply block my-4;
-  }
-  #circleDisplay {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 9;
-  }
-  #progressArc {
-    stroke-dasharray: 314;
-    stroke-dashoffset: 0;
-    transform-origin: 50px 50px;
-    transform: rotate(-90deg) scale(-1);
-  }
-  svg {
-    @apply w-64 h-64;
-  }
-  svg text {
-    @apply font-bold;
-  }
-</style>
-
-<div class="flex flex-wrap">
+<div class="flex flex-wrap justify-evenly dark:text-white">
   <div
     id="boxingTimer"
-    class="w-72 border border-purple-700 rounded-lg pb-4 mx-auto my-4">
-    <p class="text-2xl">Boxing Timer</p>
+    class="w-72 border border-purple-700 rounded-lg pb-4 my-4 dark:bg-indigo-900 dark:text-white"
+  >
+    <p class="text-2xl text-center">Boxing Timer</p>
 
-    <div class="text mb-4 flex justify-evenly space-x-4 mx-auto">
+    <div class="text mb-4 flex justify-evenly space-x-4">
       <div>Round: {completedRounds + 1}</div>
       <div>State: {currentState}</div>
     </div>
 
     <div
-      class="h-24 w-64 bg-gray-300 mx-auto text-6xl flex items-center
-      justify-center font-bold rounded"
-      class:hidden={!(timerStyle === 'rectangle')}>
+      class="mx-auto h-24 w-64 bg-gray-300 text-6xl flex items-center justify-center font-bold
+			rounded dark:text-white"
+      class:hidden={!(timerStyle === "rectangle")}
+    >
       {formatTime(timeLeft)}
     </div>
 
     <div
-      class="relative h-64 w-64 mx-auto flex items-center justify-center"
-      class:hidden={!(timerStyle === 'circle')}>
+      class="relative h-64 w-64 mx-auto flex items-center justify-center dark:text-white"
+      class:hidden={!(timerStyle === "circle")}
+    >
       <canvas height={ch} width={cw} id="circleDisplay" />
     </div>
 
     <div
       class="relative h-64 w-64 mx-auto flex items-center justify-center"
-      class:hidden={!(timerStyle === 'svg')}>
+      class:hidden={!(timerStyle === "svg")}
+    >
       <svg viewBox="0 0 100 100">
         <!-- <g id="grid" stroke="green" stroke-width=".2">
-          <path d="M0 10 H100" />
-          <path d="M0 20 H100" />
-          <path d="M0 30 H100" />
-          <path d="M0 40 H100" />
-          <path d="M0 50 H100" stroke-width="1" />
-          <path d="M0 60 H100" />
-          <path d="M0 70 H100" />
-          <path d="M0 80 H100" />
-          <path d="M0 90 H100" />
+            <path d="M0 10 H100" />
+            <path d="M0 20 H100" />
+            <path d="M0 30 H100" />
+            <path d="M0 40 H100" />
+            <path d="M0 50 H100" stroke-width="1" />
+            <path d="M0 60 H100" />
+            <path d="M0 70 H100" />
+            <path d="M0 80 H100" />
+            <path d="M0 90 H100" />
 
-          <path d="M10 0 V100" />
-          <path d="M20 0 V100" />
-          <path d="M30 0 V100" />
-          <path d="M40 0 V100" />
-          <path d="M50 0 V100" stroke-width="1" />
-          <path d="M60 0 V100" />
-          <path d="M70 0 V100" />
-          <path d="M80 0 V100" />
-          <path d="M90 0 V100" />
-        </g> -->
+            <path d="M10 0 V100" />
+            <path d="M20 0 V100" />
+            <path d="M30 0 V100" />
+            <path d="M40 0 V100" />
+            <path d="M50 0 V100" stroke-width="1" />
+            <path d="M60 0 V100" />
+            <path d="M70 0 V100" />
+            <path d="M80 0 V100" />
+            <path d="M90 0 V100" />
+          </g> -->
 
         <!-- A rx ry x-axis-rotation large-arc-flag sweep-flag x y -->
         <!-- Define a path so we can clip it later.  We do this to simulate an
-          inner stroke, since SVG doesn't support that natively yet.
-          Double the stoke size, and then clip to the outside, and your stroke is
-          now effectively inner. -->
+            inner stroke, since SVG doesn't support that natively yet.
+            Double the stoke size, and then clip to the outside, and your stroke is
+            now effectively inner. -->
         <defs>
           <path id="circle" d="M0,50 A50,50 0 1 0 0,49.999" />
           <clipPath id="clip">
@@ -302,21 +361,24 @@
           stroke="blue"
           stroke-width="18"
           fill="none"
-          clip-path="url(#clip)" />
+          clip-path="url(#clip)"
+        />
         <use
           xlink:href="#circle"
           id="progressArc"
           stroke="#e5f6f8"
           stroke-width="20"
           fill="none"
-          clip-path="url(#clip)" />
+          clip-path="url(#clip)"
+        />
         <text
           id="svgTime"
-          class="font-bold text-2xl"
+          class="font-bold text-2xl dark:stroke-white dark:fill-white"
           x="50%"
           y="51%"
           text-anchor="middle"
-          alignment-baseline="middle">
+          alignment-baseline="middle"
+        >
           {formatTime(timeLeft)}
         </text>
       </svg>
@@ -324,49 +386,61 @@
 
     <div id="timerControls" class="mt-4 mx-4 flex justify-between">
       <button
-        class="bg-green-200"
+        class="bg-green-200 dark:bg-green-700 py-1 px-3 rounded-lg border border-green-700"
         on:click={startTimer}
-        disabled={!(currentState === 'ready' || currentState === 'stopped')}>
+        disabled={!(currentState === "ready" || currentState === "stopped")}
+      >
         start
       </button>
       <button
-        class="bg-yellow-200"
+        class="bg-yellow-200 dark:bg-yellow-700 py-1 px-3 rounded-lg border border-yellow-700"
         on:click={stopTimer}
-        disabled={!(currentState === 'working' || currentState === 'resting')}>
+        disabled={!(currentState === "working" || currentState === "resting")}
+      >
         stop
       </button>
-      <button class="bg-red-200" on:click={resetTimer}>reset</button>
+      <button
+        class="bg-red-200 dark:bg-red-700 py-1 px-3 rounded-lg border border-red-700"
+        on:click={resetTimer}
+      >
+        reset
+      </button>
     </div>
   </div>
 
   <div
     id="boxingTimerSettings"
-    class="w-72 border border-purple-700 rounded-lg pb-4 align-top text-left
-    mx-auto my-4">
-
+    class="w-72 border border-purple-700 rounded-lg pb-4 align-top text-left my-4"
+  >
     <p class="text-2xl text-center">Settings</p>
 
     <div id="roundTimeControls" class="mt-4 mx-4">
       Round Time:
       <input
         id="interval"
-        class="ml-2 mr-1 w-16 rounded text-center"
-        bind:value={humanRoundTime} />
+        class="ml-2 mr-1 w-16 rounded text-center border border-gray-600 dark:text-black"
+        bind:value={humanRoundTime}
+      />
     </div>
 
     <div id="restTimeControls" class="mt-4 mx-4">
       <input class="mr-2" type="checkbox" bind:checked={takeRestRound} />
       Rest Time:
       <input
-        class="ml-2 mr-1 w-8 rounded text-center"
-        bind:value={humanRestTime} />
+        class="ml-2 mr-1 w-8 rounded text-center border border-gray-600 dark:text-black"
+        bind:value={humanRestTime}
+      />
       seconds
     </div>
 
-    <hr />
+    <hr class="my-4" />
 
     <div id="soundControls" class="mt-4 mx-4">
-      <input class="mr-2" type="checkbox" bind:checked={playSounds} />
+      <input
+        class="mr-2 border border-gray-600"
+        type="checkbox"
+        bind:checked={playSounds}
+      />
       Play Round Begin/End Sounds
     </div>
 
@@ -375,26 +449,27 @@
       Interval Sound:
       <input
         id="interval"
-        class="ml-2 mr-1 w-8 rounded text-center"
-        bind:value={humanIntervalTime} />
+        class="ml-2 mr-1 w-8 rounded text-center border border-gray-600 dark:text-black"
+        bind:value={humanIntervalTime}
+      />
       seconds
     </div>
 
-    <hr />
+    <hr class="my-4" />
 
     <div id="displayStyle" class="mt-4 mx-4">
       Timer Display Style
-      <div class="mt-2 ml-4">
+      <div class="mt-2 ml-4 flex flex-col">
         <label>
-          <input type="radio" bind:group={timerStyle} value={'rectangle'} />
+          <input type="radio" bind:group={timerStyle} value={"rectangle"} />
           Rectangle
         </label>
         <label>
-          <input type="radio" bind:group={timerStyle} value={'circle'} />
+          <input type="radio" bind:group={timerStyle} value={"circle"} />
           Circle (Canvas)
         </label>
         <label>
-          <input type="radio" bind:group={timerStyle} value={'svg'} />
+          <input type="radio" bind:group={timerStyle} value={"svg"} />
           Circle (SVG)
         </label>
       </div>
@@ -403,5 +478,38 @@
 </div>
 
 <p class="mb-4">
-  Completed Rounds: {completedRounds} ({formatTime(completedRounds * roundTime)})
+  Completed Rounds: {completedRounds} ({formatTime(
+    completedRounds * roundTime
+  )})
 </p>
+
+<style lang="postcss">
+  /* p {
+    @apply mt-4;
+  }
+  button {
+    @apply py-2 px-4 rounded;
+  }
+  hr {
+    @apply block my-4;
+  } */
+  #circleDisplay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 9;
+  }
+  #progressArc {
+    stroke-dasharray: 314;
+    stroke-dashoffset: 0;
+    transform-origin: 50px 50px;
+    transform: rotate(-90deg) scale(-1);
+  }
+  /* svg {
+    @apply w-64 h-64;
+  }
+  svg text {
+    @apply font-bold;
+  } */
+</style>
